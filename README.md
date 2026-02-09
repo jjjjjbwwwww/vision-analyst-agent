@@ -1,169 +1,132 @@
+# Vision Analyst Agent (Project 3)
+> Goal-aware planning + traceable questioning for multimodal image analysis  
+> 端口：test6=8006, test7=8007, analyst_api=8010
 
-Vision Analyst Agent (Project 3) — Goal-Aware Plan & Explainable Trace
+---
 
-一个“目标驱动”的视觉 Agent：前端给 goal + image，后端自动生成 结构化计划（plan），再根据每一步计划选择问题路径，调用上游多模态模型得到答案，并把“为什么这么问”写进 trace，最终输出可复现的分析报告。
+## 中文简介
+这是一个“目标驱动 (goal-aware)”的视觉分析 Agent：  
+用户上传图片并给出目标（goal），Agent 会**自动生成计划（Plan）**，并按计划调用多模态问答模型（test6/test7）完成**多轮提问**，最终输出结构化报告。同时，它会保存 **Trace（可复现/可调试）**：记录每一步为什么问、问了什么、模型怎么答、最终怎么汇总。
 
-1. 项目亮点（你在面试/简历里最该讲的点）
-✅ 1) Goal-Aware Planning（目标驱动计划）
+### 项目 3 相比项目 2 的升级点
+- ✅ **Plan 不再是固定 4 步**：不同 goal → 自动选择不同问题路径  
+- ✅ Trace 里提供 **question_trace**：能解释“为什么问这些问题”以及每一步的问答结果  
+- ✅ UI 展示完整链路：Plan（title/why/questions） + Trace（why + Q&A） + 最终报告  
+- ✅ 方便 Debug：每次请求生成 trace_id，并落盘保存 json / md
 
-输入不是固定模板，而是用户的 goal（例如：描述图片、找关键信息、做要点报告）
+---
 
-Agent 会生成结构化计划：
+## Architecture（文字版架构图）
+User(UI) → (8010) Vision Analyst API (/analyze)
+  → Agent Core (goal-aware planner + trace recorder)
+     → calls upstream test7 (/agent/run or /agent/chat, 8007)
+        → calls upstream test6 BLIP VQA (/vqa, /vqa_batch, 8006)
+  ← returns {plan, final_answer, trace_id, raw.trace.question_trace}
 
-{
-  "steps": [
-    { "title": "...", "why": "...", "questions": ["...", "..."] }
-  ]
-}
+---
 
+## Requirements
+- Windows 10/11
+- Python 3.10+
+- 已完成并在本机可用：
+  - test6（BLIP VQA service） running at `http://127.0.0.1:8006`
+  - test7（Agent service） running at `http://127.0.0.1:8007`
+- 本项目（Project3）运行在 `http://127.0.0.1:8010`
 
-不同 goal → 不同 steps / questions 路径（不再是通用 4 步）
+---
 
-✅ 2) Explainable Trace（可解释的轨迹）
+## Installation
+```bash
+conda activate torch
+pip install -r requirements.txt
+Run (recommended: one-click scripts)
+Option A: 手动启动
+启动 test6（端口 8006）
 
-trace 中记录：每一步为何要问、问了什么、得到什么回答
+python -m uvicorn app:app --host 127.0.0.1 --port 8006
+启动 test7（端口 8007）
 
-UI 显示 “为什么问这些问题” + “每一步问答”，可用于调试与复现
+uvicorn api:app --host 127.0.0.1 --port 8007
+启动本项目（端口 8010）
 
-✅ 3) Frontend + Backend 全链路可视化
+uvicorn app.analyst_api:app --host 127.0.0.1 --port 8010
+打开 UI
 
-Apple 风格 UI：左侧历史轮次、当前轮高亮、系统角色提示、错误友好提示
+访问：http://127.0.0.1:8010/ui.html
 
-主区展示：
+API
+POST /analyze
+multipart/form-data
 
-Plan（结构化 steps）
+image: image file (required)
 
-Answer（最终报告）
+goal: string (required)
 
-Trace（question_trace + raw JSON）
+session_id: string (optional, default: "default")
 
-2. 架构说明
-2.1 服务端口（你现在的部署）
+offline: "true" / "false" (optional, default: "true")
 
-test6 (8006)：基础 VQA（BLIP VQA / 单轮、多问题）
+max_new_tokens: int as string (optional, default: "40")
 
-test7 (8007)：Agent（多轮 + 记忆 + trace 产物）
-
-Project 3 (8010)：Vision Analyst Agent（对外统一入口）
-
-/analyze：接收图片 + goal → 返回 plan + final_answer + trace
-
-2.2 Project 3 的职责（关键）
-
-Project 3 不再只是“转发上游回答”，而是做 Agent Orchestration（编排）：
-
-解析 goal → 生成结构化 plan（steps: title/why/questions）
-
-执行 steps：调用上游模型（test7 / test6）
-
-汇总：final_answer（按 goal 格式输出）
-
-记录 trace：question_trace（why + Q&A）+ 保存 runs 产物
-
-返回给 UI：plan + final_answer + trace_id + raw
-
-3. API
-3.1 POST /analyze
-
-FormData 参数：
-
-image：图片文件（必填，第一轮）
-
-goal：用户目标/问题（必填）
-
-session_id：会话 ID（默认 default）
-
-offline：true/false（默认 true）
-
-max_new_tokens：生成长度（默认 40/120，按实现）
-
-响应示例（关键字段）：
+Response
 
 {
   "ok": true,
-  "trace_id": "trace_xxx",
+  "trace_id": "trace_...",
   "session_id": "default",
   "plan": {
+    "goal": "...",
     "steps": [
       {
-        "title": "一句话概括",
-        "why": "先抓全局，降低偏题风险",
-        "questions": ["What is shown in the image? ..."]
+        "title": "场景分析",
+        "why": "解释为什么问这类问题",
+        "questions": ["...","..."]
       }
     ]
   },
-  "final_answer": "...",
-  "raw": {
-    "trace": {
-      "question_trace": [
-        {
-          "title": "...",
-          "why": "...",
-          "questions": ["..."],
-          "qa": [
-            {"q":"...", "a":"..."}
-          ]
-        }
-      ]
-    }
-  }
+  "final_answer": "..."
 }
-
-4. UI 使用说明
-4.1 入口
-
-UI 文件：ui.html（你现在用的那个）
-
-访问：http://127.0.0.1:8010/ui.html（按你的挂载方式）
-
-4.2 UI 区域说明
+UI
+UI 页面会展示：
 
 左侧：历史轮次（Q1/Q2/Q3…），当前轮高亮
 
-中间：Plan 卡片（结构化 steps）
+中间：多轮对话 + 最终报告
 
-Trace 展开区：
+右侧：📋 Agent Plan（title/why/questions）
 
-✅ “为什么问这些问题（Question Trace）”
+Trace 区：展示 question_trace（每一步 “为什么问 + 提问 + 回答”）
 
-每一步：Why + Questions + 本步问答（Q→A）
+Trace & Reproducibility
+每次 /analyze 会保存：
 
-raw JSON（完整调试信息）
+runs/traces/<trace_id>.json
 
-5. 如何运行
-5.1 启动依赖（你已有）
-# test6
-python -m uvicorn app:app --host 127.0.0.1 --port 8006
+runs/reports/<trace_id>.md
 
-# test7
-uvicorn api:app --host 127.0.0.1 --port 8007
+Trace 关键字段：
 
-5.2 启动 Project 3（8010）
-uvicorn app.analyst_api:app --host 127.0.0.1 --port 8010
+plan.steps[]: title/why/questions（结构化计划）
 
-UI：http://127.0.0.1:8010/ui.html
+raw.trace.question_trace[]: why + questions + answers（可解释决策链路）
 
-6. 评估与调试（Trace 的意义）
-6.1 为什么要有 plan + trace？
+Common Issues
+502 Upstream error
+通常是：
 
-因为多模态系统最难的问题是：
+test6/test7 没启动
 
-不知道模型为什么这么答
+开启了系统代理导致本地转发失败（你已验证：关闭代理恢复正常）
 
-不知道哪一步出错
+422 Unprocessable Entity
+通常是 UI 请求体字段与 /analyze 的 form-data 参数不匹配。
+确保字段名是：image / goal / session_id / offline / max_new_tokens
 
-复现困难
+English README (short)
+Vision Analyst Agent (Project 3)
+A goal-aware multimodal agent that generates a structured plan and a traceable question chain (question_trace) for image analysis.
+It calls upstream services: test7 (agent) → test6 (BLIP VQA).
+The UI shows plan + trace + final report for reproducibility and debugging.
 
-Plan + Trace 的价值：
+Run: test6:8006, test7:8007, this project:8010, UI: /ui.html
 
-Plan 让你看到“它打算怎么做”
-
-Trace 让你定位“它实际做了什么、为什么做、每步结果是什么”
-
-出问题时，你能判断是：
-
-规划错（plan 不合理）
-
-执行错（问错/上游答错）
-
-汇总错（summary 合成不贴 goal）
