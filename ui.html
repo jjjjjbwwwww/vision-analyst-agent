@@ -137,7 +137,7 @@
       color:rgba(233,236,241,0.92);
       line-height:1.25;
 
-      /* 兼容：webkit + 标准 line-clamp（提示可忽略，标准属性仍在推进中） */
+      /* webkit + 标准属性（标准仍在推进中，VSCode提示可忽略） */
       display: -webkit-box;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
@@ -288,7 +288,7 @@
 
     /* plan */
     .plan-step{
-      padding:8px 10px;
+      padding:10px 10px;
       border-radius:14px;
       border:1px solid rgba(255,255,255,0.08);
       background: rgba(255,255,255,0.03);
@@ -312,6 +312,27 @@
       color: rgba(233,236,241,0.92);
       line-height:1.35;
     }
+    .plan-title{
+      font-weight:750;
+      color: rgba(233,236,241,0.96);
+      margin-bottom:4px;
+    }
+    .plan-why{
+      color: var(--muted);
+      font-size:12px;
+      margin:6px 0 0;
+      line-height:1.35;
+    }
+    .plan-qs{
+      margin-top:8px;
+      padding-top:8px;
+      border-top:1px solid rgba(255,255,255,0.06);
+      color: rgba(233,236,241,0.90);
+      font-size:12px;
+      line-height:1.35;
+    }
+    .plan-qs ul{margin:6px 0 0 18px; padding:0;}
+    .plan-qs li{margin:2px 0;}
 
     /* trace */
     details.trace{
@@ -453,7 +474,6 @@
 
 <body>
 <div class="app">
-  <!-- 左侧：历史轮次 -->
   <aside class="sidebar">
     <div class="side-head">
       <div class="brand">
@@ -475,11 +495,9 @@
 
     <div class="history" id="history">
       <h2>历史轮次（Q1 / Q2 / Q3）</h2>
-      <!-- items -->
     </div>
   </aside>
 
-  <!-- 主区 -->
   <main class="main">
     <div class="topbar">
       <div class="title">
@@ -492,7 +510,6 @@
     </div>
 
     <div class="content">
-      <!-- 左：输入/计划/trace -->
       <section class="left">
         <div class="panel">
           <div class="panel-head">
@@ -530,6 +547,7 @@
           <div class="panel-body" id="planBox">
             <div class="small">当你发送目标/问题后，这里会显示本轮 Agent 的计划步骤。</div>
           </div>
+
           <details class="trace" id="traceDetails" style="display:none">
             <summary>
               <span>🔍 Agent Trace（执行轨迹，可展开）</span>
@@ -548,7 +566,6 @@
         </div>
       </section>
 
-      <!-- 右：聊天 -->
       <section class="right">
         <div class="panel" style="flex:1; display:flex; flex-direction:column;">
           <div class="panel-head">
@@ -569,42 +586,19 @@
 </div>
 
 <script>
-/**
- * ================================
- * 配置：API_BASE / 路由
- * ================================
- * 默认同域：UI 和 API 都在 8010 → API_BASE = ""
- * 如果 UI 静态打开 file:// 或 UI 在别的端口 → 填 "http://127.0.0.1:8010"
- */
-const API_BASE = ""; // 例如 "http://127.0.0.1:8010"
-
-/**
- * ✅ 关键改动：你的后端路由是 @app.post("/analyze")
- * 所以前端必须请求 /analyze，而不是 /agent/chat
- */
+const API_BASE = "";             // 同域
 const ENDPOINT_ANALYZE = "/analyze";
 const DEFAULT_SESSION = "default";
 
 document.getElementById("apiBaseLabel").textContent = API_BASE ? API_BASE : "同域";
 document.getElementById("sessionLabel").textContent = DEFAULT_SESSION;
 
-/**
- * ================================
- * 状态
- * ================================
- */
 let sessionId = DEFAULT_SESSION;
-let currentImageFile = null;   // File
-let currentImageURL = null;    // objectURL
+let currentImageFile = null;
+let currentImageURL = null;
 
-// 历史轮：每轮保存 goal + final_answer + plan + raw/trace
-let rounds = []; // {id, goal, answer, plan, raw, trace_id}
+let rounds = [];
 
-/**
- * ================================
- * DOM
- * ================================
- */
 const elChat = document.getElementById("chat");
 const elHistory = document.getElementById("history");
 const elStatus = document.getElementById("status");
@@ -618,11 +612,6 @@ const elThumb = document.getElementById("thumb");
 const elImgMeta = document.getElementById("imgMeta");
 const elQInput = document.getElementById("qInput");
 
-/**
- * ================================
- * 工具：UI 状态条
- * ================================
- */
 function setStatus(type, title, detail=""){
   elStatus.className = "status " + type;
   const icon = type === "ok" ? "✅" : (type === "err" ? "❌" : "⚠️");
@@ -645,20 +634,18 @@ function scrollChatToBottom(){
   elChat.scrollTop = elChat.scrollHeight;
 }
 
-/**
- * ================================
- * 渲染：聊天消息
- * ================================
- */
 function addMessage(role, text){
   const div = document.createElement("div");
   div.className = "msg " + (role === "user" ? "user" : "assistant");
+
   const avatar = document.createElement("div");
   avatar.className = "avatar";
   avatar.textContent = role === "user" ? "" : "AI";
+
   const bubble = document.createElement("div");
   bubble.className = "bubble";
   bubble.textContent = text;
+
   if(role === "user"){
     div.appendChild(bubble);
   }else{
@@ -670,48 +657,153 @@ function addMessage(role, text){
 }
 
 /**
- * ================================
- * 渲染：Plan
- * ================================
+ * ✅ renderPlan：兼容两种 steps
+ * - 旧：steps: ["1) ...", "2) ..."]
+ * - 新：steps: [{title, why, questions:[...]}]
  */
 function renderPlan(plan){
-  if(!plan || !plan.steps || !Array.isArray(plan.steps)){
+  const steps = plan?.steps;
+  if(!steps || !Array.isArray(steps) || steps.length === 0){
     elPlanMeta.textContent = "无计划";
     elPlanBox.innerHTML = `<div class="small">本轮没有返回 plan.steps。</div>`;
     return;
   }
-  elPlanMeta.textContent = `共 ${plan.steps.length} 步`;
-  elPlanBox.innerHTML = plan.steps.map((s, i) => `
-    <div class="plan-step">
-      <div class="plan-badge">Step ${i+1}</div>
-      <div class="plan-text">${escapeHtml(s)}</div>
-    </div>
-  `).join("");
+
+  elPlanMeta.textContent = `共 ${steps.length} 步`;
+
+  elPlanBox.innerHTML = steps.map((s, i) => {
+    // 旧版：string
+    if(typeof s === "string"){
+      return `
+        <div class="plan-step">
+          <div class="plan-badge">Step ${i+1}</div>
+          <div class="plan-text">${escapeHtml(s)}</div>
+        </div>
+      `;
+    }
+
+    // 新版：object
+    const title = s?.title ?? `Step ${i+1}`;
+    const why = s?.why ?? "";
+    const qs = Array.isArray(s?.questions) ? s.questions : [];
+    const qsHtml = qs.length ? `
+      <div class="plan-qs">
+        <div style="color:var(--muted);font-weight:700;">建议问题</div>
+        <ul>${qs.map(q => `<li>${escapeHtml(q)}</li>`).join("")}</ul>
+      </div>
+    ` : "";
+
+    return `
+      <div class="plan-step">
+        <div class="plan-badge">Step ${i+1}</div>
+        <div class="plan-text">
+          <div class="plan-title">${escapeHtml(title)}</div>
+          ${why ? `<div class="plan-why">Why：${escapeHtml(why)}</div>` : ""}
+          ${qsHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 /**
- * ================================
- * 渲染：Trace / Raw
- * ================================
- * 你的 /analyze 返回里通常会有：
- * - trace_id
- * - plan
- * - final_answer
- * - raw（包含 outputs/tool_calls/saved_json/saved_md 等）
+ * ✅ Trace 区：展示 question_trace（为什么问 + 每一步的回答）
+ * 规则：
+ * 1) 优先读 raw.trace.question_trace[*].qa (如果后端给了 qa: [{q,a}])
+ * 2) 否则，从 outputs.vqa_batch.results 里构建 question->answer 的映射，给每个 step 的 questions 补上 answer
  */
 function renderTrace(raw, traceId){
   let html = "";
   html += `<div class="trace-kv"><span>trace_id</span><div class="mono">${escapeHtml(traceId || raw?.trace_id || "-")}</div></div>`;
 
-  // 保存文件（如果后端返回）
   const savedJson = raw?.saved_json || raw?.raw?.saved_json;
   const savedMd   = raw?.saved_md   || raw?.raw?.saved_md;
   if(savedJson) html += `<div class="trace-kv"><span>saved_json</span><div class="mono">${escapeHtml(savedJson)}</div></div>`;
   if(savedMd)   html += `<div class="trace-kv"><span>saved_md</span><div class="mono">${escapeHtml(savedMd)}</div></div>`;
 
-  // 展示 Key Q&A（如果 raw.outputs.vqa_batch.results 存在）
-  const outputs = raw?.outputs || raw?.raw?.outputs || raw?.trace?.outputs || null;
+  // outputs 位置兼容
+  const outputs = raw?.outputs || raw?.raw?.outputs || raw?.trace?.outputs || raw?.raw?.trace?.outputs || null;
   const vqaBatch = outputs?.vqa_batch;
+
+  // 先做 question -> answer 映射（用于补全每步回答）
+  const answerMap = new Map();
+  if(vqaBatch?.results && Array.isArray(vqaBatch.results)){
+    for(const r of vqaBatch.results){
+      if(r?.question != null){
+        answerMap.set(String(r.question).trim(), String(r.answer ?? "").trim());
+      }
+    }
+  }
+
+  // ✅ question_trace：为什么问 + 每一步回答
+  const qtrace = raw?.trace?.question_trace || raw?.raw?.trace?.question_trace;
+  if(Array.isArray(qtrace) && qtrace.length){
+    html += `<div style="margin-top:10px;color:var(--muted);font-size:12px;font-weight:700;">🧭 为什么问这些问题（Question Trace）</div>`;
+    html += `<div class="qa">` + qtrace.map((t, i) => {
+      const title = t?.title ?? `Step ${i+1}`;
+      const why = t?.why ?? "";
+      const qs = Array.isArray(t?.questions) ? t.questions : [];
+
+      // 1) 优先 qa
+      const qa = Array.isArray(t?.qa) ? t.qa : null;
+
+      // 2) 否则用 qs + answerMap 补齐
+      const qaHtml = (() => {
+        if(qa && qa.length){
+          return `
+            <div class="qa-a" style="margin-top:8px;">
+              <div style="color:var(--muted);font-weight:700;margin-bottom:6px;">本步问答</div>
+              ${qa.map((x, k) => `
+                <div style="margin:6px 0;">
+                  <div class="mono">Q${k+1}: ${escapeHtml(x?.q ?? "")}</div>
+                  <div class="mono" style="color:var(--muted);margin-top:2px;">A: ${escapeHtml(x?.a ?? "")}</div>
+                </div>
+              `).join("")}
+            </div>
+          `;
+        }
+
+        if(qs.length){
+          return `
+            <div class="qa-a" style="margin-top:8px;">
+              <div style="color:var(--muted);font-weight:700;margin-bottom:6px;">本步问答（由 vqa_batch 自动匹配）</div>
+              ${qs.map((q, k) => {
+                const qq = String(q ?? "").trim();
+                const ans = answerMap.get(qq) ?? "(未找到对应回答)";
+                return `
+                  <div style="margin:6px 0;">
+                    <div class="mono">Q${k+1}: ${escapeHtml(qq)}</div>
+                    <div class="mono" style="color:var(--muted);margin-top:2px;">A: ${escapeHtml(ans)}</div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          `;
+        }
+
+        return `<div class="qa-a" style="margin-top:8px;">（该步骤未提供 questions/qa）</div>`;
+      })();
+
+      // 还保留“建议问题”列表（你需要看到问了哪些）
+      const qsHtml = qs.length ? `
+        <div class="qa-a" style="margin-top:8px;">
+          <div style="color:var(--muted);font-weight:700;margin-bottom:6px;">Questions（本步建议/实际提问）</div>
+          ${qs.map(q => `<div class="mono" style="margin:2px 0;">• ${escapeHtml(q)}</div>`).join("")}
+        </div>
+      ` : "";
+
+      return `
+        <div class="qa-item">
+          <div class="qa-q">${escapeHtml(title)}</div>
+          ${why ? `<div class="qa-a">Why：${escapeHtml(why)}</div>` : ""}
+          ${qsHtml}
+          ${qaHtml}
+        </div>
+      `;
+    }).join("") + `</div>`;
+  }
+
+  // 仍然展示 Key Q&A（来自 vqa_batch）
   if(vqaBatch?.results && Array.isArray(vqaBatch.results)){
     html += `<div style="margin-top:10px;color:var(--muted);font-size:12px;font-weight:700;">🧩 Key Q&A（来自 vqa_batch）</div>`;
     html += `<div class="qa">` + vqaBatch.results.map((r, i) => `
@@ -722,7 +814,6 @@ function renderTrace(raw, traceId){
     `).join("") + `</div>`;
   }
 
-  // 原始 JSON（调试）
   html += `<div style="margin-top:10px;color:var(--muted);font-size:12px;font-weight:700;">🧾 原始 Raw/Trace JSON</div>`;
   html += `<pre class="trace-pre">${escapeHtml(JSON.stringify(raw, null, 2))}</pre>`;
 
@@ -730,11 +821,6 @@ function renderTrace(raw, traceId){
   elTraceDetails.style.display = "block";
 }
 
-/**
- * ================================
- * 左侧历史：渲染 & 选择
- * ================================
- */
 function renderHistory(){
   const nodes = Array.from(elHistory.querySelectorAll(".hist-item"));
   nodes.forEach(n => n.remove());
@@ -773,11 +859,6 @@ function selectRound(index){
   setStatus("ok", `已切换到历史轮 Q${index+1}`, "左侧高亮显示当前轮次。");
 }
 
-/**
- * ================================
- * 图片：选择/清除
- * ================================
- */
 document.querySelector(".file").addEventListener("click", () => elFileInput.click());
 
 elFileInput.addEventListener("change", (e) => {
@@ -813,40 +894,16 @@ document.getElementById("btnReset").addEventListener("click", () => {
   setStatus("warn", "会话已重置", "历史轮次清空；你可以重新上传图片并开始。");
 });
 
-/**
- * ================================
- * 请求：/analyze（multipart/form-data）
- * ================================
- * ✅ 关键：字段必须匹配后端 /analyze 的参数名
- * - image: UploadFile（建议第一轮必须传）
- * - goal : str（你的“目标/问题”）
- * - session_id: str（多轮记忆）
- * - offline: bool（可选）
- * - max_new_tokens: int（可选）
- *
- * 返回你已经看到的结构：
- * {
- *   ok, trace_id, session_id,
- *   plan, final_answer, raw
- * }
- */
 async function agentAnalyze(goalText){
   const url = (API_BASE || "") + ENDPOINT_ANALYZE;
-
   const fd = new FormData();
 
-  // 第一轮必须有图片；后续为了稳定，也继续带上（不依赖后端是否持久化图片）
   if(currentImageFile){
     fd.append("image", currentImageFile, currentImageFile.name);
   }
 
-  // ✅ 改动：后端要 goal，不是 question
   fd.append("goal", goalText);
-
-  // ✅ session
   fd.append("session_id", sessionId);
-
-  // 可选参数（后端若不支持也无妨：会用默认/忽略）
   fd.append("offline", "true");
   fd.append("max_new_tokens", "120");
 
@@ -871,11 +928,6 @@ async function agentAnalyze(goalText){
   return data;
 }
 
-/**
- * ================================
- * 发送逻辑
- * ================================
- */
 async function onSend(){
   const goal = (elQInput.value || "").trim();
 
@@ -898,14 +950,11 @@ async function onSend(){
     const ans = data.final_answer || data.answer || "(无 final_answer 字段)";
     addMessage("assistant", ans);
 
-    // Plan
     renderPlan(data.plan);
 
-    // Raw/Trace
     if(data.raw){
       renderTrace(data.raw, data.trace_id);
     }else{
-      // 有的实现可能直接把 trace 放在根字段
       renderTrace(data, data.trace_id);
     }
 
@@ -937,7 +986,6 @@ elQInput.addEventListener("keydown", (e) => {
   }
 });
 
-// 初始渲染
 renderHistory();
 setStatus("warn", "等待输入", "上传图片后，在右侧输入目标/问题并发送。");
 </script>

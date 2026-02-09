@@ -11,6 +11,7 @@ import httpx
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from app.agent_core import run_agent_a
 
 
 # =========================
@@ -187,27 +188,25 @@ async def analyze(
         if not img_bytes:
             return err_json("图片内容为空（可能没正确上传）", trace_id, session_id, status=422)
 
-        url = TEST7_BASE + TEST7_RUN_PATH
+        out = await run_agent_a(
+            img_bytes=img_bytes,
+            filename=image.filename or "image.jpg",
+            goal=goal.strip(),
+            session_id=session_id,
+            offline=str(offline).lower(),
+            max_new_tokens=str(max_new_tokens),
+        )
 
-        fields = {
-            "goal": goal.strip(),
-            "session_id": session_id,
-            "offline": str(offline).lower(),
-            "max_new_tokens": str(max_new_tokens),
-        }
-
-        out = await post_multipart(url, img_bytes, image.filename or "image.jpg", fields)
-
-        # test7 通常会返回 trace_id / final_answer / plan / outputs
-        # 我们统一包装一下
         return {
             "ok": True,
             "trace_id": out.get("trace_id", trace_id),
             "session_id": session_id,
-            "plan": out.get("plan", None),
-            "final_answer": out.get("final_answer", out),
-            "raw": out,
+            "plan": out.get("plan"),
+            "final_answer": out.get("final_answer"),
+            "summary": out.get("summary"),
+            "raw": out.get("raw"),
         }
+
 
     except Exception as e:
         # 这里是你之前看到的 “Upstream 502 空 body”

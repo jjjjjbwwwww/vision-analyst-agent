@@ -1,167 +1,169 @@
 
-# Vision Analyst Agent  
-*A Planning-based Multimodal Vision Agent with Traceable Reasoning*
+Vision Analyst Agent (Project 3) — Goal-Aware Plan & Explainable Trace
 
----
+一个“目标驱动”的视觉 Agent：前端给 goal + image，后端自动生成 结构化计划（plan），再根据每一步计划选择问题路径，调用上游多模态模型得到答案，并把“为什么这么问”写进 trace，最终输出可复现的分析报告。
 
-##  项目简介
+1. 项目亮点（你在面试/简历里最该讲的点）
+✅ 1) Goal-Aware Planning（目标驱动计划）
 
-Vision Analyst Agent 是一个 **基于规划（Planning）与可追溯执行（Trace）** 的多模态视觉 Agent 系统。
+输入不是固定模板，而是用户的 goal（例如：描述图片、找关键信息、做要点报告）
 
-系统能够：
-- 理解用户给定的高层目标（Goal）
-- 自动生成分析计划（Plan）
-- 调用视觉感知工具（VQA / Caption）
-- 汇总中间结果并输出结构化答案
-- 生成完整可复现的执行 Trace（JSON / Markdown）
+Agent 会生成结构化计划：
 
-本项目不是简单的“多轮 VQA”，而是一个 具备任务分解、工具调用与过程解释能力的 Vision Agent。
+{
+  "steps": [
+    { "title": "...", "why": "...", "questions": ["...", "..."] }
+  ]
+}
 
----
 
-##  核心能力
+不同 goal → 不同 steps / questions 路径（不再是通用 4 步）
 
--  **Goal → Plan → Tool → Aggregate**
--  多模态感知（图像 + 文本）
--  可解释执行过程（Trace）
--  多轮对话 + 会话记忆
--  支持离线评测与策略对比
+✅ 2) Explainable Trace（可解释的轨迹）
 
----
+trace 中记录：每一步为何要问、问了什么、得到什么回答
 
-##  系统架构
+UI 显示 “为什么问这些问题” + “每一步问答”，可用于调试与复现
 
-```text
-[ Web UI ]
-     |
-     v
-[ Vision Analyst API :8010 ]
-     |
-     v
-[ Agent Engine ]
-     |
-     +--> [ Perception Service :8006 ]
-     |
-     +--> [ Planning / Trace Service :8007 ]
-     |
-     v
-[ JSON / Markdown Trace ]
-##  模块说明
-1. Perception Service（test6）
-图像描述（Caption）
+✅ 3) Frontend + Backend 全链路可视化
 
-图像问答（VQA / VQA Batch）
+Apple 风格 UI：左侧历史轮次、当前轮高亮、系统角色提示、错误友好提示
 
-专注“看图”，不参与策略决策
+主区展示：
 
-2. Agent Planning Service（test7）
-根据用户 Goal 生成分析计划
+Plan（结构化 steps）
 
-调度感知工具
+Answer（最终报告）
 
-汇总结果并生成 Trace
+Trace（question_trace + raw JSON）
 
-3. Vision Analyst API（project2）
-对外统一入口 /analyze
+2. 架构说明
+2.1 服务端口（你现在的部署）
 
-管理会话与多轮对话
+test6 (8006)：基础 VQA（BLIP VQA / 单轮、多问题）
 
-处理上游异常与 Trace 落盘
+test7 (8007)：Agent（多轮 + 记忆 + trace 产物）
 
-4. Web UI
-Apple 风格多轮对话界面
+Project 3 (8010)：Vision Analyst Agent（对外统一入口）
 
-显示 Agent Plan 与执行过程
+/analyze：接收图片 + goal → 返回 plan + final_answer + trace
 
-支持历史轮次与错误提示
+2.2 Project 3 的职责（关键）
 
- 执行流程示例
-用户目标：
+Project 3 不再只是“转发上游回答”，而是做 Agent Orchestration（编排）：
 
-“请描述图片内容，并总结关键物体与细节”
+解析 goal → 生成结构化 plan（steps: title/why/questions）
 
-Agent 执行：
+执行 steps：调用上游模型（test7 / test6）
 
-生成一句话图像概括
+汇总：final_answer（按 goal 格式输出）
 
-提问关键问题（场景 / 主体 / 细节）
+记录 trace：question_trace（why + Q&A）+ 保存 runs 产物
 
-汇总为要点报告
+返回给 UI：plan + final_answer + trace_id + raw
 
-输出 Trace（JSON + Markdown）
+3. API
+3.1 POST /analyze
 
-## Trace 示例
-每次执行都会生成：
+FormData 参数：
 
-runs/trace_xxx.json（机器可读）
+image：图片文件（必填，第一轮）
 
-runs/trace_xxx.md（人类可读）
+goal：用户目标/问题（必填）
 
-用于：
+session_id：会话 ID（默认 default）
 
-调试
+offline：true/false（默认 true）
 
-复现实验
+max_new_tokens：生成长度（默认 40/120，按实现）
 
-离线评测
+响应示例（关键字段）：
 
-## 离线评测（test8 / test9）
-项目支持多种 Agent 策略对比：
+{
+  "ok": true,
+  "trace_id": "trace_xxx",
+  "session_id": "default",
+  "plan": {
+    "steps": [
+      {
+        "title": "一句话概括",
+        "why": "先抓全局，降低偏题风险",
+        "questions": ["What is shown in the image? ..."]
+      }
+    ]
+  },
+  "final_answer": "...",
+  "raw": {
+    "trace": {
+      "question_trace": [
+        {
+          "title": "...",
+          "why": "...",
+          "questions": ["..."],
+          "qa": [
+            {"q":"...", "a":"..."}
+          ]
+        }
+      ]
+    }
+  }
+}
 
-baseline
+4. UI 使用说明
+4.1 入口
 
-naive_reflect
+UI 文件：ui.html（你现在用的那个）
 
-gated_reflect
+访问：http://127.0.0.1:8010/ui.html（按你的挂载方式）
 
-评测指标包括：
+4.2 UI 区域说明
 
-bad（不合理回答比例）
+左侧：历史轮次（Q1/Q2/Q3…），当前轮高亮
 
-rep（重复度）
+中间：Plan 卡片（结构化 steps）
 
-summary_ok（是否形成有效总结）
+Trace 展开区：
 
-实验表明：
+✅ “为什么问这些问题（Question Trace）”
 
-并非“更多反思 = 更好结果”，合理的 Gate 更重要。
+每一步：Why + Questions + 本步问答（Q→A）
 
-## 启动方式（示例）
-# 感知服务
-uvicorn app:app --host 127.0.0.1 --port 8006
+raw JSON（完整调试信息）
 
-# Agent 规划服务
+5. 如何运行
+5.1 启动依赖（你已有）
+# test6
+python -m uvicorn app:app --host 127.0.0.1 --port 8006
+
+# test7
 uvicorn api:app --host 127.0.0.1 --port 8007
 
-# Vision Analyst 主服务
+5.2 启动 Project 3（8010）
 uvicorn app.analyst_api:app --host 127.0.0.1 --port 8010
 
-API Docs: http://127.0.0.1:8010/docs
+UI：http://127.0.0.1:8010/ui.html
 
-UI: http://127.0.0.1:8010/ui.html
+6. 评估与调试（Trace 的意义）
+6.1 为什么要有 plan + trace？
 
+因为多模态系统最难的问题是：
 
-## 项目定位
-这是一个 工程化 Vision Agent 案例，重点在于：
+不知道模型为什么这么答
 
-系统设计
+不知道哪一步出错
 
-Agent 行为建模
+复现困难
 
-工具调用与规划
+Plan + Trace 的价值：
 
-可解释性与复现能力
+Plan 让你看到“它打算怎么做”
 
-而非单一模型效果对比。
+Trace 让你定位“它实际做了什么、为什么做、每步结果是什么”
 
-## 技术栈
-Python / FastAPI
+出问题时，你能判断是：
 
-Multimodal VQA Models
+规划错（plan 不合理）
 
-Agent Planning & Trace
+执行错（问错/上游答错）
 
-Web UI (HTML / JS)
-
-## License
-Academic / Learning Purpose
+汇总错（summary 合成不贴 goal）
