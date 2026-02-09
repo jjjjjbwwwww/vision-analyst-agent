@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vision Analyst Agent</title>
+  <style>
+    :root{
+      --bg:#0b0c0f;
+      --panel:#12141a;
+      --card:#151824;
+      --card2:#0f1117;
+      --text:#e9ecf1;
+      --muted:#aab2c0;
+      --muted2:#8a93a3;
+      --border:rgba(255,255,255,0.08);
+      --shadow:0 12px 30px rgba(0,0,0,0.35);
+      --blue:#0a84ff;
+      --green:#34c759;
+      --red:#ff3b30;
+      --yellow:#ffd60a;
+      --radius:18px;
+      --radius2:14px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--sans);
+      color:var(--text);
+      background: radial-gradient(1200px 600px at 30% -10%, rgba(10,132,255,0.25), transparent 60%),
+                  radial-gradient(900px 500px at 85% 10%, rgba(52,199,89,0.16), transparent 60%),
+                  var(--bg);
+      min-height:100vh;
+      overflow:hidden;
+    }
+    a{color:inherit}
+    .app{
+      height:100vh;
+      display:flex;
+      gap:16px;
+      padding:16px;
+    }
+    .sidebar{
+      width:300px;
+      min-width:280px;
+      background: rgba(18,20,26,0.65);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+    }
+    .side-head{
+      padding:14px 14px 10px;
+      border-bottom:1px solid var(--border);
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+    }
+    .dot{
+      width:11px; height:11px; border-radius:50%;
+      background: var(--blue);
+      box-shadow: 0 0 0 6px rgba(10,132,255,0.15);
+    }
+    .brand h1{
+      margin:0;
+      font-size:14px;
+      font-weight:700;
+      letter-spacing:0.2px;
+    }
+    .brand p{
+      margin:4px 0 0;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.2;
+    }
+    .sys-box{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      background: rgba(255,255,255,0.04);
+      border:1px solid var(--border);
+    }
+    .sys-title{
+      display:flex; align-items:center; gap:8px;
+      color:var(--muted);
+      font-size:12px;
+      margin:0 0 6px;
+    }
+    .sys-text{
+      margin:0;
+      font-size:12px;
+      color:rgba(233,236,241,0.92);
+      line-height:1.35;
+    }
+
+    .history{
+      padding:10px;
+      overflow:auto;
+      flex:1;
+    }
+    .history h2{
+      margin:6px 6px 10px;
+      font-size:12px;
+      color:var(--muted);
+      font-weight:600;
+      letter-spacing:0.2px;
+    }
+    .hist-item{
+      display:flex;
+      gap:10px;
+      padding:10px 10px;
+      margin:8px 4px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background: rgba(255,255,255,0.03);
+      cursor:pointer;
+      transition: transform .12s ease, background .12s ease, border-color .12s ease;
+    }
+    .hist-item:hover{transform: translateY(-1px); background: rgba(255,255,255,0.04);}
+    .hist-item.active{
+      border-color: rgba(10,132,255,0.55);
+      background: rgba(10,132,255,0.12);
+    }
+    .hist-q{
+      font-size:12px;
+      color:var(--muted);
+      min-width:42px;
+    }
+    .hist-snippet{
+      font-size:12px;
+      color:rgba(233,236,241,0.92);
+      line-height:1.25;
+
+      /* 兼容：webkit + 标准 line-clamp（提示可忽略，标准属性仍在推进中） */
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+    }
+
+    .main{
+      flex:1;
+      background: rgba(18,20,26,0.55);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      min-width:640px;
+    }
+    .topbar{
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+    }
+    .topbar .title{
+      display:flex; flex-direction:column;
+      gap:3px;
+    }
+    .topbar .title .t1{font-weight:750; font-size:14px; margin:0;}
+    .topbar .title .t2{font-size:12px; color:var(--muted); margin:0;}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      font-size:12px;
+      color:var(--muted);
+      user-select:none;
+    }
+    .pill b{color:var(--text); font-weight:700}
+    .content{
+      display:flex;
+      gap:16px;
+      padding:16px;
+      flex:1;
+      overflow:hidden;
+    }
+    .left{
+      width:360px;
+      min-width:330px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .panel{
+      background: rgba(21,24,36,0.72);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      overflow:hidden;
+    }
+    .panel-head{
+      padding:12px 12px 10px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+    }
+    .panel-head h3{
+      margin:0;
+      font-size:12px;
+      color:var(--muted);
+      font-weight:700;
+      letter-spacing:0.2px;
+    }
+    .panel-body{padding:12px;}
+    .uploader{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .file{
+      flex:1;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px dashed rgba(255,255,255,0.16);
+      background: rgba(0,0,0,0.18);
+      cursor:pointer;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .thumb{
+      width:64px; height:64px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .thumb img{width:100%; height:100%; object-fit:cover;}
+    .controls{
+      display:flex; gap:10px; margin-top:10px;
+    }
+    .btn{
+      appearance:none;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,0.05);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:14px;
+      font-size:12px;
+      cursor:pointer;
+      transition: transform .12s ease, background .12s ease;
+      user-select:none;
+    }
+    .btn:hover{transform: translateY(-1px); background: rgba(255,255,255,0.07);}
+    .btn.primary{
+      border-color: rgba(10,132,255,0.45);
+      background: rgba(10,132,255,0.14);
+    }
+    .btn.danger{
+      border-color: rgba(255,59,48,0.45);
+      background: rgba(255,59,48,0.12);
+    }
+    .input{
+      width:100%;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,0.20);
+      color:var(--text);
+      outline:none;
+      font-size:13px;
+    }
+    .hint{
+      margin-top:8px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.35;
+    }
+
+    /* plan */
+    .plan-step{
+      padding:8px 10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      margin-bottom:8px;
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .plan-badge{
+      min-width:34px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:11px;
+      border:1px solid rgba(10,132,255,0.35);
+      background: rgba(10,132,255,0.12);
+      color: rgba(233,236,241,0.95);
+      text-align:center;
+    }
+    .plan-text{
+      font-size:12px;
+      color: rgba(233,236,241,0.92);
+      line-height:1.35;
+    }
+
+    /* trace */
+    details.trace{
+      border-top:1px solid var(--border);
+      margin-top:10px;
+    }
+    details.trace summary{
+      list-style:none;
+      cursor:pointer;
+      padding:12px 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      color:var(--muted);
+      font-size:12px;
+      user-select:none;
+    }
+    details.trace summary::-webkit-details-marker{display:none;}
+    .trace-body{
+      padding:12px;
+      border-top:1px solid var(--border);
+      background: rgba(0,0,0,0.16);
+    }
+    .trace-kv{
+      display:flex;
+      gap:10px;
+      margin:6px 0;
+      font-size:12px;
+      color: rgba(233,236,241,0.92);
+    }
+    .trace-kv span{color:var(--muted); min-width:90px;}
+    .trace-pre{
+      font-family: var(--mono);
+      font-size:11px;
+      line-height:1.4;
+      color: rgba(233,236,241,0.92);
+      background: rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:14px;
+      padding:10px;
+      overflow:auto;
+      max-height:260px;
+      white-space:pre;
+    }
+    .qa{
+      margin-top:8px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .qa-item{
+      border:1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      border-radius:14px;
+      padding:10px;
+      font-size:12px;
+      line-height:1.4;
+    }
+    .qa-q{color:rgba(233,236,241,0.95); font-weight:650;}
+    .qa-a{color:var(--muted); margin-top:4px;}
+
+    /* chat */
+    .right{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+      gap:12px;
+    }
+    .chat{
+      flex:1;
+      overflow:auto;
+      padding:12px;
+    }
+    .msg{
+      display:flex;
+      gap:10px;
+      margin:10px 0;
+    }
+    .avatar{
+      width:28px; height:28px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:12px;
+      color:var(--muted);
+      flex-shrink:0;
+    }
+    .bubble{
+      max-width: 78%;
+      padding:12px 12px;
+      border-radius: 18px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.22);
+      font-size:13px;
+      line-height:1.45;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .msg.user{justify-content:flex-end;}
+    .msg.user .avatar{display:none;}
+    .msg.user .bubble{
+      background: rgba(10,132,255,0.16);
+      border-color: rgba(10,132,255,0.35);
+    }
+
+    .composer{
+      padding:12px;
+      border-top:1px solid var(--border);
+      background: rgba(0,0,0,0.14);
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .composer .input{flex:1;}
+    .status{
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .status.ok{border-color: rgba(52,199,89,0.35); background: rgba(52,199,89,0.10);}
+    .status.warn{border-color: rgba(255,214,10,0.35); background: rgba(255,214,10,0.10);}
+    .status.err{border-color: rgba(255,59,48,0.40); background: rgba(255,59,48,0.12);}
+    .status b{color:var(--text);}
+    .mono{font-family:var(--mono); font-size:11px; color:rgba(233,236,241,0.90);}
+    .small{font-size:11px; color:var(--muted2);}
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <!-- 左侧：历史轮次 -->
+  <aside class="sidebar">
+    <div class="side-head">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <h1>Vision Analyst Agent</h1>
+          <p>多轮 + 记忆 · 计划 + Trace 可视化</p>
+        </div>
+      </div>
+
+      <div class="sys-box">
+        <div class="sys-title">🧠 System</div>
+        <p class="sys-text">You are a multimodal assistant that can understand images and answer questions.</p>
+        <p class="sys-text" style="margin-top:6px;color:var(--muted);">
+          你会：根据目标生成计划 → 调用上游模型 → 汇总输出 → 返回 trace 便于复现与调试。
+        </p>
+      </div>
+    </div>
+
+    <div class="history" id="history">
+      <h2>历史轮次（Q1 / Q2 / Q3）</h2>
+      <!-- items -->
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+    <div class="topbar">
+      <div class="title">
+        <p class="t1">对话工作台</p>
+        <p class="t2">上传图片后开始多轮问答；每轮会保存到左侧历史。</p>
+      </div>
+      <div class="pill" id="pill">
+        API：<b id="apiBaseLabel">同域</b> · 会话：<b id="sessionLabel">default</b>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- 左：输入/计划/trace -->
+      <section class="left">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>📷 图片</h3>
+            <div class="small" id="imgMeta">未选择</div>
+          </div>
+          <div class="panel-body">
+            <div class="uploader">
+              <label class="file">
+                选择图片（jpg/png）…
+                <input id="fileInput" type="file" accept="image/*" style="display:none" />
+              </label>
+              <div class="thumb" id="thumb">
+                <span class="small">No Image</span>
+              </div>
+            </div>
+            <div class="controls">
+              <button class="btn" id="btnClearImg">清除图片</button>
+              <button class="btn danger" id="btnReset">重置会话</button>
+            </div>
+            <div class="hint">
+              友好提示：<br/>
+              • 未选图片 → 会提示你先上传（第一轮必须有图）<br/>
+              • 目标/问题为空 → 会提示你输入<br/>
+              • API 异常 → 会显示详细错误信息（含 trace_id）
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>📋 Agent 计划（Plan）</h3>
+            <div class="small" id="planMeta">等待生成</div>
+          </div>
+          <div class="panel-body" id="planBox">
+            <div class="small">当你发送目标/问题后，这里会显示本轮 Agent 的计划步骤。</div>
+          </div>
+          <details class="trace" id="traceDetails" style="display:none">
+            <summary>
+              <span>🔍 Agent Trace（执行轨迹，可展开）</span>
+              <span class="small">点击展开</span>
+            </summary>
+            <div class="trace-body" id="traceBox"></div>
+          </details>
+        </div>
+
+        <div class="status warn" id="status">
+          <div>⚠️</div>
+          <div>
+            <div><b>状态</b>：等待输入</div>
+            <div class="small">准备就绪后，在右侧输入目标/问题并发送。</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右：聊天 -->
+      <section class="right">
+        <div class="panel" style="flex:1; display:flex; flex-direction:column;">
+          <div class="panel-head">
+            <h3>💬 多轮对话</h3>
+            <div class="small" id="roundMeta">当前轮：-</div>
+          </div>
+
+          <div class="chat" id="chat"></div>
+
+          <div class="composer">
+            <input class="input" id="qInput" placeholder="输入目标/问题（例如：请描述图片内容并总结要点 / 图里是什么？）" />
+            <button class="btn primary" id="btnSend">发送</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+/**
+ * ================================
+ * 配置：API_BASE / 路由
+ * ================================
+ * 默认同域：UI 和 API 都在 8010 → API_BASE = ""
+ * 如果 UI 静态打开 file:// 或 UI 在别的端口 → 填 "http://127.0.0.1:8010"
+ */
+const API_BASE = ""; // 例如 "http://127.0.0.1:8010"
+
+/**
+ * ✅ 关键改动：你的后端路由是 @app.post("/analyze")
+ * 所以前端必须请求 /analyze，而不是 /agent/chat
+ */
+const ENDPOINT_ANALYZE = "/analyze";
+const DEFAULT_SESSION = "default";
+
+document.getElementById("apiBaseLabel").textContent = API_BASE ? API_BASE : "同域";
+document.getElementById("sessionLabel").textContent = DEFAULT_SESSION;
+
+/**
+ * ================================
+ * 状态
+ * ================================
+ */
+let sessionId = DEFAULT_SESSION;
+let currentImageFile = null;   // File
+let currentImageURL = null;    // objectURL
+
+// 历史轮：每轮保存 goal + final_answer + plan + raw/trace
+let rounds = []; // {id, goal, answer, plan, raw, trace_id}
+
+/**
+ * ================================
+ * DOM
+ * ================================
+ */
+const elChat = document.getElementById("chat");
+const elHistory = document.getElementById("history");
+const elStatus = document.getElementById("status");
+const elPlanBox = document.getElementById("planBox");
+const elPlanMeta = document.getElementById("planMeta");
+const elTraceDetails = document.getElementById("traceDetails");
+const elTraceBox = document.getElementById("traceBox");
+const elRoundMeta = document.getElementById("roundMeta");
+const elFileInput = document.getElementById("fileInput");
+const elThumb = document.getElementById("thumb");
+const elImgMeta = document.getElementById("imgMeta");
+const elQInput = document.getElementById("qInput");
+
+/**
+ * ================================
+ * 工具：UI 状态条
+ * ================================
+ */
+function setStatus(type, title, detail=""){
+  elStatus.className = "status " + type;
+  const icon = type === "ok" ? "✅" : (type === "err" ? "❌" : "⚠️");
+  elStatus.innerHTML = `
+    <div>${icon}</div>
+    <div>
+      <div><b>${title}</b></div>
+      <div class="small">${escapeHtml(detail)}</div>
+    </div>
+  `;
+}
+
+function escapeHtml(str){
+  return String(str ?? "").replace(/[&<>"']/g, s => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[s]));
+}
+
+function scrollChatToBottom(){
+  elChat.scrollTop = elChat.scrollHeight;
+}
+
+/**
+ * ================================
+ * 渲染：聊天消息
+ * ================================
+ */
+function addMessage(role, text){
+  const div = document.createElement("div");
+  div.className = "msg " + (role === "user" ? "user" : "assistant");
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = role === "user" ? "" : "AI";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text;
+  if(role === "user"){
+    div.appendChild(bubble);
+  }else{
+    div.appendChild(avatar);
+    div.appendChild(bubble);
+  }
+  elChat.appendChild(div);
+  scrollChatToBottom();
+}
+
+/**
+ * ================================
+ * 渲染：Plan
+ * ================================
+ */
+function renderPlan(plan){
+  if(!plan || !plan.steps || !Array.isArray(plan.steps)){
+    elPlanMeta.textContent = "无计划";
+    elPlanBox.innerHTML = `<div class="small">本轮没有返回 plan.steps。</div>`;
+    return;
+  }
+  elPlanMeta.textContent = `共 ${plan.steps.length} 步`;
+  elPlanBox.innerHTML = plan.steps.map((s, i) => `
+    <div class="plan-step">
+      <div class="plan-badge">Step ${i+1}</div>
+      <div class="plan-text">${escapeHtml(s)}</div>
+    </div>
+  `).join("");
+}
+
+/**
+ * ================================
+ * 渲染：Trace / Raw
+ * ================================
+ * 你的 /analyze 返回里通常会有：
+ * - trace_id
+ * - plan
+ * - final_answer
+ * - raw（包含 outputs/tool_calls/saved_json/saved_md 等）
+ */
+function renderTrace(raw, traceId){
+  let html = "";
+  html += `<div class="trace-kv"><span>trace_id</span><div class="mono">${escapeHtml(traceId || raw?.trace_id || "-")}</div></div>`;
+
+  // 保存文件（如果后端返回）
+  const savedJson = raw?.saved_json || raw?.raw?.saved_json;
+  const savedMd   = raw?.saved_md   || raw?.raw?.saved_md;
+  if(savedJson) html += `<div class="trace-kv"><span>saved_json</span><div class="mono">${escapeHtml(savedJson)}</div></div>`;
+  if(savedMd)   html += `<div class="trace-kv"><span>saved_md</span><div class="mono">${escapeHtml(savedMd)}</div></div>`;
+
+  // 展示 Key Q&A（如果 raw.outputs.vqa_batch.results 存在）
+  const outputs = raw?.outputs || raw?.raw?.outputs || raw?.trace?.outputs || null;
+  const vqaBatch = outputs?.vqa_batch;
+  if(vqaBatch?.results && Array.isArray(vqaBatch.results)){
+    html += `<div style="margin-top:10px;color:var(--muted);font-size:12px;font-weight:700;">🧩 Key Q&A（来自 vqa_batch）</div>`;
+    html += `<div class="qa">` + vqaBatch.results.map((r, i) => `
+      <div class="qa-item">
+        <div class="qa-q">Q${i+1}. ${escapeHtml(r.question)}</div>
+        <div class="qa-a">A: ${escapeHtml(r.answer)}</div>
+      </div>
+    `).join("") + `</div>`;
+  }
+
+  // 原始 JSON（调试）
+  html += `<div style="margin-top:10px;color:var(--muted);font-size:12px;font-weight:700;">🧾 原始 Raw/Trace JSON</div>`;
+  html += `<pre class="trace-pre">${escapeHtml(JSON.stringify(raw, null, 2))}</pre>`;
+
+  elTraceBox.innerHTML = html;
+  elTraceDetails.style.display = "block";
+}
+
+/**
+ * ================================
+ * 左侧历史：渲染 & 选择
+ * ================================
+ */
+function renderHistory(){
+  const nodes = Array.from(elHistory.querySelectorAll(".hist-item"));
+  nodes.forEach(n => n.remove());
+
+  rounds.forEach((r, idx) => {
+    const div = document.createElement("div");
+    div.className = "hist-item" + (idx === rounds.length - 1 ? " active" : "");
+    div.innerHTML = `
+      <div class="hist-q">Q${idx+1}</div>
+      <div class="hist-snippet">${escapeHtml(r.goal || "")}</div>
+    `;
+    div.onclick = () => selectRound(idx);
+    elHistory.appendChild(div);
+  });
+
+  elRoundMeta.textContent = rounds.length ? `当前轮：Q${rounds.length}` : "当前轮：-";
+}
+
+function setActiveHistory(index){
+  const items = Array.from(elHistory.querySelectorAll(".hist-item"));
+  items.forEach((it, i) => it.classList.toggle("active", i === index));
+}
+
+function selectRound(index){
+  const r = rounds[index];
+  if(!r) return;
+  setActiveHistory(index);
+
+  renderPlan(r.plan);
+  if(r.raw){
+    renderTrace(r.raw, r.trace_id);
+  }else{
+    elTraceDetails.style.display = "none";
+  }
+  elPlanMeta.textContent = r.plan?.steps ? `共 ${r.plan.steps.length} 步（历史）` : "历史轮无计划";
+  setStatus("ok", `已切换到历史轮 Q${index+1}`, "左侧高亮显示当前轮次。");
+}
+
+/**
+ * ================================
+ * 图片：选择/清除
+ * ================================
+ */
+document.querySelector(".file").addEventListener("click", () => elFileInput.click());
+
+elFileInput.addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
+  if(!file) return;
+  currentImageFile = file;
+
+  if(currentImageURL) URL.revokeObjectURL(currentImageURL);
+  currentImageURL = URL.createObjectURL(file);
+
+  elThumb.innerHTML = `<img src="${currentImageURL}" alt="preview"/>`;
+  elImgMeta.textContent = `${file.name} · ${(file.size/1024).toFixed(1)}KB`;
+  setStatus("ok", "图片已选择", "现在可以开始提问/给目标（多轮记忆会保留本张图片）。");
+});
+
+document.getElementById("btnClearImg").addEventListener("click", () => {
+  currentImageFile = null;
+  if(currentImageURL) URL.revokeObjectURL(currentImageURL);
+  currentImageURL = null;
+  elFileInput.value = "";
+  elThumb.innerHTML = `<span class="small">No Image</span>`;
+  elImgMeta.textContent = "未选择";
+  setStatus("warn", "已清除图片", "请重新上传图片后再开始第一轮。");
+});
+
+document.getElementById("btnReset").addEventListener("click", () => {
+  rounds = [];
+  elChat.innerHTML = "";
+  elPlanBox.innerHTML = `<div class="small">当你发送目标/问题后，这里会显示本轮 Agent 的计划步骤。</div>`;
+  elPlanMeta.textContent = "等待生成";
+  elTraceDetails.style.display = "none";
+  renderHistory();
+  setStatus("warn", "会话已重置", "历史轮次清空；你可以重新上传图片并开始。");
+});
+
+/**
+ * ================================
+ * 请求：/analyze（multipart/form-data）
+ * ================================
+ * ✅ 关键：字段必须匹配后端 /analyze 的参数名
+ * - image: UploadFile（建议第一轮必须传）
+ * - goal : str（你的“目标/问题”）
+ * - session_id: str（多轮记忆）
+ * - offline: bool（可选）
+ * - max_new_tokens: int（可选）
+ *
+ * 返回你已经看到的结构：
+ * {
+ *   ok, trace_id, session_id,
+ *   plan, final_answer, raw
+ * }
+ */
+async function agentAnalyze(goalText){
+  const url = (API_BASE || "") + ENDPOINT_ANALYZE;
+
+  const fd = new FormData();
+
+  // 第一轮必须有图片；后续为了稳定，也继续带上（不依赖后端是否持久化图片）
+  if(currentImageFile){
+    fd.append("image", currentImageFile, currentImageFile.name);
+  }
+
+  // ✅ 改动：后端要 goal，不是 question
+  fd.append("goal", goalText);
+
+  // ✅ session
+  fd.append("session_id", sessionId);
+
+  // 可选参数（后端若不支持也无妨：会用默认/忽略）
+  fd.append("offline", "true");
+  fd.append("max_new_tokens", "120");
+
+  const resp = await fetch(url, { method:"POST", body: fd });
+
+  const ct = resp.headers.get("content-type") || "";
+  let data = null;
+
+  if(ct.includes("application/json")){
+    data = await resp.json();
+  }else{
+    const txt = await resp.text();
+    throw new Error(`API 返回非 JSON：status=${resp.status} body=${txt.slice(0,200)}`);
+  }
+
+  if(!resp.ok){
+    const msg = data?.error || `请求失败：HTTP ${resp.status}`;
+    const traceId = data?.trace_id ? ` trace_id=${data.trace_id}` : "";
+    throw new Error(`${msg}${traceId}`);
+  }
+
+  return data;
+}
+
+/**
+ * ================================
+ * 发送逻辑
+ * ================================
+ */
+async function onSend(){
+  const goal = (elQInput.value || "").trim();
+
+  if(!currentImageFile && rounds.length === 0){
+    setStatus("warn", "请先选择图片", "未选择图片时无法开始第一轮分析。");
+    return;
+  }
+  if(!goal){
+    setStatus("warn", "请输入目标/问题", "为空会导致 422 或无效请求。");
+    return;
+  }
+
+  addMessage("user", goal);
+  elQInput.value = "";
+  setStatus("warn", "正在分析…", "Agent 正在生成计划并调用上游模型。");
+
+  try{
+    const data = await agentAnalyze(goal);
+
+    const ans = data.final_answer || data.answer || "(无 final_answer 字段)";
+    addMessage("assistant", ans);
+
+    // Plan
+    renderPlan(data.plan);
+
+    // Raw/Trace
+    if(data.raw){
+      renderTrace(data.raw, data.trace_id);
+    }else{
+      // 有的实现可能直接把 trace 放在根字段
+      renderTrace(data, data.trace_id);
+    }
+
+    rounds.push({
+      id: data.trace_id || `round_${rounds.length+1}`,
+      goal: goal,
+      answer: ans,
+      plan: data.plan || null,
+      raw: data.raw || data || null,
+      trace_id: data.trace_id || null
+    });
+
+    renderHistory();
+    setActiveHistory(rounds.length - 1);
+
+    setStatus("ok", "完成 ✅", data.trace_id ? `trace_id: ${data.trace_id}` : "本轮无 trace_id");
+  }catch(err){
+    const msg = String(err?.message || err || "未知错误");
+    addMessage("assistant", `（出错了）\n${msg}`);
+    setStatus("err", "请求失败 (API 异常)", msg);
+  }
+}
+
+document.getElementById("btnSend").addEventListener("click", onSend);
+elQInput.addEventListener("keydown", (e) => {
+  if(e.key === "Enter" && !e.shiftKey){
+    e.preventDefault();
+    onSend();
+  }
+});
+
+// 初始渲染
+renderHistory();
+setStatus("warn", "等待输入", "上传图片后，在右侧输入目标/问题并发送。");
+</script>
+</body>
+</html>
