@@ -1,24 +1,50 @@
 
 
+# =====================
 # Python
+# =====================
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Env
+# =====================
+# Virtual env
+# =====================
 .venv/
+venv/
+env/
 .env
 
-# Runtime outputs
-runs/
-logs/
-data/
+# =====================
+# Huggingface cache
+# =====================
+.cache/
+huggingface/
 
+# =====================
 # Models
+# =====================
 *.pt
 *.pth
 *.bin
 *.safetensors
 
+# =====================
+# Runtime
+# =====================
+runs/
+logs/
+outputs/
+
+# =====================
+# IDE
+# =====================
+.vscode/
+.idea/
+
+# =====================
 # OS
+# =====================
 .DS_Store
 Thumbs.db
