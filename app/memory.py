@@ -18,9 +18,7 @@ class Turn:
 class SessionMemory:
     """
     一个非常轻量的“对话记忆”：
-    - 以 session_id 为key
-    - 每轮保存 {q, a, ts}
-    - 落盘到 runs/sessions/<session_id>.json
+    
     """
 
     def __init__(self, base_dir: Path, max_turns: int = 20):
@@ -65,9 +63,7 @@ class SessionMemory:
         return turns
 
     def to_ui_list(self, turns: List[Turn]) -> List[Dict[str, Any]]:
-        """
-        给前端用的简化结构：[{idx, q, a}]
-        """
+        
         out = []
         for i, t in enumerate(turns, start=1):
             out.append({"idx": i, "q": t.q, "a": t.a})
