@@ -20,7 +20,7 @@ from app.agent_core import run_agent_a
 APP_TITLE = "Vision Analyst Agent"
 APP_PORT = 8010
 
-# 你的上游 test7（Agent）地址
+# 你的上游（Agent）地址
 TEST7_BASE = "http://127.0.0.1:8007"
 TEST7_CHAT_PATH = "/agent/chat"
 TEST7_RUN_PATH = "/agent/run"
@@ -31,12 +31,12 @@ DEFAULT_SESSION_ID = "default"
 # =========================
 # Paths
 # =========================
-# 重要：此文件在 vision_analyst_agent/app/ 下
+# ：此文件在 vision_analyst_agent/app/ 下
 # 项目根目录 = parent.parent
 ROOT_DIR = Path(__file__).resolve().parent.parent
 UI_DIR = ROOT_DIR / "ui"
-UI_FILE_AT_ROOT = ROOT_DIR / "ui.html"          # 如果你放在根目录
-UI_FILE_IN_UI_DIR = UI_DIR / "ui.html"          # 如果你放在 ui/ 目录
+UI_FILE_AT_ROOT = ROOT_DIR / "ui.html"          # 如果放在根目录
+UI_FILE_IN_UI_DIR = UI_DIR / "ui.html"          # 如果放在 ui/ 目录
 
 
 # =========================
@@ -72,10 +72,7 @@ async def post_multipart(
     fields: Dict[str, str],
     timeout_s: float = 120.0,
 ) -> Dict[str, Any]:
-    """
-    以 multipart/form-data 方式转发到上游。
-    这会避免 json 编码/转义问题，也是 test6/test7 常用的方式。
-    """
+    
     files = {
         "image": (image_filename, image_bytes, "image/jpeg"),
     }
@@ -86,7 +83,7 @@ async def post_multipart(
     text = r.text if r.text is not None else ""
 
     if r.status_code >= 400:
-        # 把关键信息都带回来，便于你定位（包括空 body 的情况）
+        # 把关键信息都带回来，便于定位
         raise RuntimeError(
             f"Upstream error: url={url} status={r.status_code} content_type={ct} body={text[:800]}"
         )
@@ -124,7 +121,7 @@ def err_json(message: str, trace_id: str, session_id: str, extra: Optional[Dict[
 # =========================
 # Static UI serving
 # =========================
-# 如果存在 ui/ 目录，则挂载静态目录：/ui/xxx
+
 if UI_DIR.exists() and UI_DIR.is_dir():
     app.mount("/ui", StaticFiles(directory=str(UI_DIR), html=False), name="ui")
 
@@ -136,7 +133,7 @@ def index():
     """
     ui = pick_ui_file()
     if ui is None:
-        # 给出清晰提示，避免你“404 不知道为啥”
+       
         return HTMLResponse(
             content=(
                 "<h3>UI not found</h3>"
@@ -151,9 +148,7 @@ def index():
 
 @app.get("/ui.html")
 def ui_html():
-    """
-    兼容你手动访问 /ui.html
-    """
+    
     ui = pick_ui_file()
     if ui is None:
         return JSONResponse(
@@ -174,9 +169,7 @@ async def analyze(
     offline: str = Form("true"),
     max_new_tokens: str = Form("40"),
 ):
-    """
-    A 路线：前端给 goal + 图片，我们调用 test7 /agent/run，返回 plan + final_answer + trace_id
-    """
+    
     trace_id = now_trace_id()
     try:
         if image is None:
@@ -209,7 +202,7 @@ async def analyze(
 
 
     except Exception as e:
-        # 这里是你之前看到的 “Upstream 502 空 body”
+        
         return err_json(f"对话失败：{e}", trace_id, session_id, status=500)
 
 
@@ -224,9 +217,7 @@ async def chat(
     offline: str = Form("true"),
     max_new_tokens: str = Form("40"),
 ):
-    """
-    多轮：前端只发 question（可选 image），由 test7 /agent/chat 管记忆
-    """
+   
     trace_id = now_trace_id()
     try:
         if question is None or not question.strip():
@@ -248,7 +239,7 @@ async def chat(
             }
             out = await post_multipart(url, img_bytes, image.filename or "image.jpg", fields)
         else:
-            # 没图就用 JSON 也行（test7 只要支持即可）
+            
             payload = {
                 "question": question.strip(),
                 "session_id": session_id,
@@ -261,7 +252,7 @@ async def chat(
             "ok": True,
             "trace_id": out.get("trace_id", trace_id),
             "session_id": session_id,
-            # test7 可能返回 answer / final / history 等
+            
             "answer": out.get("answer") or out.get("final") or out.get("final_answer") or out,
             "raw": out,
         }
