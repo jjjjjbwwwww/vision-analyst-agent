@@ -19,11 +19,7 @@ def save_trace_and_report(
     trace_id: str,
     payload: Dict[str, Any],
 ) -> Dict[str, str]:
-    """
-    保存：
-    - runs/traces/<trace_id>.json
-    - runs/reports/<trace_id>.md
-    """
+   
     d = ensure_dirs(runs_dir)
     trace_path = d["traces"] / f"{trace_id}.json"
     md_path = d["reports"] / f"{trace_id}.md"
@@ -31,13 +27,13 @@ def save_trace_and_report(
     # 1) json trace
     trace_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # 2) md report（可读）
+    # 2) md report
     final_answer = payload.get("final_answer", "")
     plan = payload.get("plan", {})
     steps = plan.get("steps", [])
     goal = plan.get("goal", payload.get("goal", ""))
 
-    # 一些可选字段
+  
     outputs = payload.get("outputs", {})
     caption = ""
     if isinstance(outputs, dict):
@@ -63,7 +59,7 @@ def save_trace_and_report(
     lines.append(final_answer if final_answer else "(empty)\n")
     lines.append("\n")
 
-    # trace 摘要（便于 debug）
+    # trace 摘要
     trace_obj = payload.get("trace", {})
     if isinstance(trace_obj, dict):
         tool_calls = trace_obj.get("tool_calls", [])
