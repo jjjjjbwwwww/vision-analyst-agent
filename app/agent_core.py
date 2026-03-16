@@ -43,12 +43,12 @@ async def _post_multipart_json(
 
 def _build_plan(goal: str) -> Dict[str, Any]:
     """
-    ✅ 项目3核心：不同 goal -> 不同 steps/questions/why
-    这里给你一个最小可用的规则版（后面你可以继续升级为更复杂的决策器）
+    不同 goal -> 不同 steps/questions/why
+
     """
     g = (goal or "").strip().lower()
 
-    # 简单意图分类（你可以继续扩展）
+    # 简单意图分类
     want_ocr = any(k in g for k in ["文字", "ocr", "text", "logo", "标志", "招牌"])
     want_count = any(k in g for k in ["多少", "几个", "数量", "how many", "count"])
     want_object = any(k in g for k in ["是什么", "what is", "main object", "主体", "物体", "objects"])
@@ -56,7 +56,7 @@ def _build_plan(goal: str) -> Dict[str, Any]:
 
     steps: List[Dict[str, Any]] = []
 
-    # Step 1: Caption 永远做（快速对齐）
+    
     steps.append({
         "title": "一句话概括",
         "why": "先用一句话抓住全局，降低后续问答偏题风险。",
@@ -65,7 +65,7 @@ def _build_plan(goal: str) -> Dict[str, Any]:
         ]
     })
 
-    # Step 2: Scene（按需）
+   
     if want_scene or (not want_object and not want_ocr and not want_count):
         steps.append({
             "title": "场景分析",
@@ -77,7 +77,7 @@ def _build_plan(goal: str) -> Dict[str, Any]:
             ]
         })
 
-    # Step 3: Objects（按需）
+    
     if want_object or True:
         steps.append({
             "title": "主体与关键物体",
@@ -89,7 +89,7 @@ def _build_plan(goal: str) -> Dict[str, Any]:
             ]
         })
 
-    # Step 4: OCR/Signs（按需）
+   
     if want_ocr:
         steps.append({
             "title": "文字与标志",
@@ -99,7 +99,7 @@ def _build_plan(goal: str) -> Dict[str, Any]:
             ]
         })
 
-    # Step 5: Counting（按需）
+    
     if want_count:
         steps.append({
             "title": "数量估计",
@@ -116,9 +116,7 @@ def _build_plan(goal: str) -> Dict[str, Any]:
 
 
 def _format_final_answer(goal: str, caption: str, qa_blocks: List[Dict[str, Any]]) -> str:
-    """
-    ✅ 本地把结果组织成最终报告（可控、稳定、可复现）
-    """
+    
     lines: List[str] = []
     lines.append(f"Goal: {goal}")
     lines.append(f"Caption: {caption}")
@@ -133,10 +131,10 @@ def _format_final_answer(goal: str, caption: str, qa_blocks: List[Dict[str, Any]
             lines.append(f"      A: {a}")
             q_idx += 1
 
-    # Summary（简单规则总结：后面你可以换成“再调用一次模型做总结”）
+    # Summary
     lines.append("")
     lines.append("Summary:")
-    # 从已有答案里抽几个关键字段（最小版本）
+    # 从已有答案里抽几个关键字段
     scene = ""
     main_obj = ""
     details = ""
@@ -175,10 +173,10 @@ async def run_agent_a(
     session_id: str = "default",
     offline: str = "true",
     max_new_tokens: str = "40",
-    model_dir: Optional[str] = None,  # 允许你传 test6 本地模型目录
+    model_dir: Optional[str] = None,  # 允许你传本地模型目录
 ) -> Dict[str, Any]:
     """
-    ✅ 最小 Executor：自己执行 plan，每一步调用 test6，并返回结构化 plan + question_trace
+     最小 Executor：
     """
     trace_id = _now_trace_id()
 
@@ -187,7 +185,7 @@ async def run_agent_a(
     question_trace: List[Dict[str, Any]] = []
     qa_blocks: List[Dict[str, Any]] = []
 
-    # 1) Caption（用 test6 /vqa）
+    # 1) Caption
     cap_q = plan["steps"][0]["questions"][0]
     fields_vqa = {
         "question": cap_q,
@@ -217,7 +215,7 @@ async def run_agent_a(
         "qas": [{"q": cap_q, "a": caption}],
     })
 
-    # 2) 其余 steps -> /vqa_batch（按 step 分批调用，方便 trace 按步骤展示）
+    # 2) 其余 steps -> /vqa_batch
     for step in plan["steps"][1:]:
         qs = step.get("questions", [])
         if not qs:
@@ -255,13 +253,13 @@ async def run_agent_a(
 
     final_answer = _format_final_answer(goal, caption, qa_blocks)
 
-    # raw 里给 UI 用（你之前 UI 里就是读 raw.trace.question_trace）
+   
     raw = {
         "trace_id": trace_id,
         "plan": plan,
         "outputs": {
             "caption": cap_out,
-            # 不强行塞每个 batch 的原始 output（太大），你想要也可以加
+            # 不强行塞每个 batch 的原始 output
         },
         "trace": {
             "question_trace": question_trace
@@ -270,10 +268,10 @@ async def run_agent_a(
 
     return {
         "trace_id": trace_id,
-        "plan": plan,                 # ✅ 结构化 steps[{title,why,questions}]
-        "final_answer": final_answer, # ✅ 最终报告
+        "plan": plan,                 
+        "final_answer": final_answer, 
         "summary": {                  # 可选：给 UI 单独展示
             "caption": caption
         },
-        "raw": raw                    # ✅ trace.question_trace 在这里
+        "raw": raw                    
     }
