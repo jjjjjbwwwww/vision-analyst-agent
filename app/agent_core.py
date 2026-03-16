@@ -24,13 +24,11 @@ async def _post_multipart_json(
     fields: Dict[str, str],
     timeout_s: float = 120.0,
 ) -> Dict[str, Any]:
-    """
-    用 multipart/form-data 调用 test6 的 /vqa 或 /vqa_batch
-    """
+    
     files = {"image": (filename, img_bytes, "image/jpeg")}
     async with httpx.AsyncClient(timeout=timeout_s) as client:
         r = await client.post(url, data=fields, files=files)
-    # 502/500 也把 body 带回来，方便你定位
+    # 502/500 也把 body 带回来，方便定位
     ct = r.headers.get("content-type", "")
     body = r.text if r.text else ""
     if r.status_code != 200:
